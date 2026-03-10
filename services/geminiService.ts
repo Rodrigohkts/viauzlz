@@ -1,24 +1,20 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Helper to get API Key (Prioritizes LocalStorage > Env Var)
+// Helper to get API Key (Hardcoded as requested)
 const getApiKey = (): string => {
-    const customKey = localStorage.getItem('vizualz_custom_api_key');
-    if (customKey && customKey.trim() !== '') {
-        return customKey.trim();
-    }
-    return (process.env.API_KEY || '').trim();
+    return 'AIzaSyDz4yN2UKivdKsFhBVzE1IeiUEjwBGwzMU';
 };
 
 // Helper to remove the data URL prefix for the API
 const cleanBase64 = (base64: string): string => {
-  // Robustly remove data URI prefix by finding the 'base64,' marker
-  const marker = ';base64,';
-  const markerIndex = base64.indexOf(marker);
-  if (markerIndex !== -1) {
-    return base64.substring(markerIndex + marker.length);
-  }
-  return base64;
+    // Robustly remove data URI prefix by finding the 'base64,' marker
+    const marker = ';base64,';
+    const markerIndex = base64.indexOf(marker);
+    if (markerIndex !== -1) {
+        return base64.substring(markerIndex + marker.length);
+    }
+    return base64;
 };
 
 const getMimeType = (base64: string): string => {
@@ -33,134 +29,134 @@ const getMimeType = (base64: string): string => {
     if (base64.startsWith('R0lGODdh') || base64.startsWith('R0lGODlh')) return 'image/gif';
     if (base64.startsWith('UklGR')) return 'image/webp'; // WebP often starts with RIFF
     if (base64.startsWith('AAAAHGZ0eXBhdmlm')) return 'image/avif'; // Common AVIF header
-    
+
     return 'image/jpeg'; // Safe default
 }
 
 // Pro model for High-Quality Fusion and Editing
-const PRO_MODEL_ID = 'gemini-3-pro-image-preview';
+const PRO_MODEL_ID = 'gemini-2.0-pro-exp-02-05';
 const TEXT_MODEL_ID = 'gemini-3-flash-preview'; // Fast model for text enhancement
 
 export const generateOutfitSwap = async (
-  personImageBase64: string,
-  clothingImageBase64: string,
-  aspectRatio: string = '1:1'
+    personImageBase64: string,
+    clothingImageBase64: string,
+    aspectRatio: string = '1:1'
 ): Promise<string> => {
-  try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key não encontrada. Configure no menu secreto (41417).");
-    
-    const ai = new GoogleGenAI({ apiKey });
+    try {
+        const apiKey = getApiKey();
+        if (!apiKey) throw new Error("API Key não encontrada. Configure no menu secreto (41417).");
 
-    const personMime = getMimeType(personImageBase64);
-    const clothingMime = getMimeType(clothingImageBase64);
+        const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: PRO_MODEL_ID,
-      contents: {
-        parts: [
-          {
-            text: "Atue como um especialista sênior em retoque digital e IA de moda (Virtual Try-On). Sua tarefa é realizar uma SUBSTITUIÇÃO TOTAL de vestuário.\n\nINSTRUÇÕES RIGOROSAS:\n1. APAGUE COMPLETAMENTE a roupa que a pessoa está vestindo na primeira imagem. Ignore a textura, cor e estampa da roupa antiga.\n2. VISTA a pessoa com a roupa fornecida na segunda imagem. A nova roupa deve ser opaca e cobrir totalmente a área do corpo correspondente.\n3. PROIBIDO: Não faça fusão (blending) entre a roupa antiga e a nova. Não deixe a roupa antiga 'vazar' ou aparecer por baixo. O resultado deve parecer que a pessoa vestiu apenas a nova peça.\n4. RECONSTRUÇÃO DE PELE: Se a nova roupa for mais curta, decotada ou sem mangas em comparação com a original, você DEVE reconstruir a pele visível (inpainting) com textura e tom de pele realistas e anatomicamente corretos.\n5. PRESERVE RIGOROSAMENTE: O rosto (identidade), cabelo, mãos, acessórios (relógios, anéis), pose exata e todo o cenário de fundo. A iluminação na nova roupa deve corresponder à iluminação da cena.\n\nGere apenas a imagem final realista em alta qualidade."
-          },
-          {
-            inlineData: {
-              mimeType: personMime,
-              data: cleanBase64(personImageBase64),
+        const personMime = getMimeType(personImageBase64);
+        const clothingMime = getMimeType(clothingImageBase64);
+
+        const response = await ai.models.generateContent({
+            model: PRO_MODEL_ID,
+            contents: {
+                parts: [
+                    {
+                        text: "Atue como um especialista sênior em retoque digital e IA de moda (Virtual Try-On). Sua tarefa é realizar uma SUBSTITUIÇÃO TOTAL de vestuário.\n\nINSTRUÇÕES RIGOROSAS:\n1. APAGUE COMPLETAMENTE a roupa que a pessoa está vestindo na primeira imagem. Ignore a textura, cor e estampa da roupa antiga.\n2. VISTA a pessoa com a roupa fornecida na segunda imagem. A nova roupa deve ser opaca e cobrir totalmente a área do corpo correspondente.\n3. PROIBIDO: Não faça fusão (blending) entre a roupa antiga e a nova. Não deixe a roupa antiga 'vazar' ou aparecer por baixo. O resultado deve parecer que a pessoa vestiu apenas a nova peça.\n4. RECONSTRUÇÃO DE PELE: Se a nova roupa for mais curta, decotada ou sem mangas em comparação com a original, você DEVE reconstruir a pele visível (inpainting) com textura e tom de pele realistas e anatomicamente corretos.\n5. PRESERVE RIGOROSAMENTE: O rosto (identidade), cabelo, mãos, acessórios (relógios, anéis), pose exata e todo o cenário de fundo. A iluminação na nova roupa deve corresponder à iluminação da cena.\n\nGere apenas a imagem final realista em alta qualidade."
+                    },
+                    {
+                        inlineData: {
+                            mimeType: personMime,
+                            data: cleanBase64(personImageBase64),
+                        },
+                    },
+                    {
+                        inlineData: {
+                            mimeType: clothingMime,
+                            data: cleanBase64(clothingImageBase64),
+                        },
+                    },
+                ],
             },
-          },
-          {
-            inlineData: {
-              mimeType: clothingMime,
-              data: cleanBase64(clothingImageBase64),
-            },
-          },
-        ],
-      },
-      config: {
-        imageConfig: {
-            imageSize: "1K",
-            aspectRatio: aspectRatio as any
+            config: {
+                imageConfig: {
+                    imageSize: "1K",
+                    aspectRatio: aspectRatio as any
+                }
+            }
+        });
+
+        const parts = response.candidates?.[0]?.content?.parts;
+
+        if (parts) {
+            for (const part of parts) {
+                if (part.inlineData && part.inlineData.data) {
+                    return `data:image/png;base64,${part.inlineData.data}`;
+                }
+            }
+            // If no image part, look for text to explain refusal
+            for (const part of parts) {
+                if (part.text) {
+                    console.warn("Model Refusal/Text:", part.text);
+                    throw new Error("A IA recusou gerar a imagem (Safety/Policy). Tente uma imagem diferente.");
+                }
+            }
         }
-      }
-    });
 
-    const parts = response.candidates?.[0]?.content?.parts;
-    
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+        throw new Error("A IA não retornou uma imagem válida.");
+
+    } catch (error: any) {
+        console.error("Gemini API Error:", error);
+        if (error.status === 429 || (error.message && error.message.includes('429'))) {
+            throw new Error("Cota da API excedida (429). Tente novamente em alguns minutos ou troque a chave.");
         }
-      }
-      // If no image part, look for text to explain refusal
-      for (const part of parts) {
-          if (part.text) {
-              console.warn("Model Refusal/Text:", part.text);
-              throw new Error("A IA recusou gerar a imagem (Safety/Policy). Tente uma imagem diferente.");
-          }
-      }
+        throw error;
     }
-
-    throw new Error("A IA não retornou uma imagem válida.");
-
-  } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    if (error.status === 429 || (error.message && error.message.includes('429'))) {
-        throw new Error("Cota da API excedida (429). Tente novamente em alguns minutos ou troque a chave.");
-    }
-    throw error;
-  }
 };
 
 export const refineImage = async (
-  baseImageBase64: string,
-  instruction: string
+    baseImageBase64: string,
+    instruction: string
 ): Promise<string> => {
-  try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key não encontrada.");
-    const ai = new GoogleGenAI({ apiKey });
-    
-    const mimeType = getMimeType(baseImageBase64);
+    try {
+        const apiKey = getApiKey();
+        if (!apiKey) throw new Error("API Key não encontrada.");
+        const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: PRO_MODEL_ID, // Updated to Pro
-      contents: {
-        parts: [
-          {
-            text: `Atue como um editor de fotografia de moda high-end. Siga estritamente esta instrução de edição: "${instruction}".\n\nREGRAS DE OURO:\n1. IMUTÁVEL: A pessoa, seu rosto, corpo, pose e, PRINCIPALMENTE, a roupa que ela está vestindo DEVEM PERMANECER IDÊNTICOS. Não mude a cor nem o corte da roupa.\n2. ALTERAÇÃO: Mude apenas o que foi pedido (fundo, luz ou filtro).\n3. REALISMO: Se mudar o fundo, ajuste sutilmente a iluminação nas bordas do sujeito para integrar com o novo ambiente, mas sem alterar a roupa.`
-          },
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: cleanBase64(baseImageBase64),
+        const mimeType = getMimeType(baseImageBase64);
+
+        const response = await ai.models.generateContent({
+            model: PRO_MODEL_ID, // Updated to Pro
+            contents: {
+                parts: [
+                    {
+                        text: `Atue como um editor de fotografia de moda high-end. Siga estritamente esta instrução de edição: "${instruction}".\n\nREGRAS DE OURO:\n1. IMUTÁVEL: A pessoa, seu rosto, corpo, pose e, PRINCIPALMENTE, a roupa que ela está vestindo DEVEM PERMANECER IDÊNTICOS. Não mude a cor nem o corte da roupa.\n2. ALTERAÇÃO: Mude apenas o que foi pedido (fundo, luz ou filtro).\n3. REALISMO: Se mudar o fundo, ajuste sutilmente a iluminação nas bordas do sujeito para integrar com o novo ambiente, mas sem alterar a roupa.`
+                    },
+                    {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: cleanBase64(baseImageBase64),
+                        },
+                    },
+                ],
             },
-          },
-        ],
-      },
-      config: {
-        imageConfig: {
-            imageSize: "1K"
-        }
-      }
-    });
+            config: {
+                imageConfig: {
+                    imageSize: "1K"
+                }
+            }
+        });
 
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+        const parts = response.candidates?.[0]?.content?.parts;
+        if (parts) {
+            for (const part of parts) {
+                if (part.inlineData && part.inlineData.data) {
+                    return `data:image/png;base64,${part.inlineData.data}`;
+                }
+            }
         }
-      }
+        throw new Error("Falha ao gerar a edição.");
+    } catch (error: any) {
+        console.error("Gemini Refine Error:", error);
+        if (error.status === 429 || (error.message && error.message.includes('429'))) {
+            throw new Error("Cota excedida (429). Aguarde um momento.");
+        }
+        throw error;
     }
-    throw new Error("Falha ao gerar a edição.");
-  } catch (error: any) {
-    console.error("Gemini Refine Error:", error);
-    if (error.status === 429 || (error.message && error.message.includes('429'))) {
-        throw new Error("Cota excedida (429). Aguarde um momento.");
-    }
-    throw error;
-  }
 };
 
 export const generatePoseVariation = async (
@@ -348,8 +344,8 @@ export const applyFlyerText = async (
         const flyerMime = getMimeType(flyerBase64);
 
         // Enhance the user's color selection with instructions to maintain contrast
-        const colorInstruction = fontColor 
-            ? `Cor Base: ${fontColor}. IMPORTANTE: Se o fundo for da mesma cor ou muito próximo, adicione AUTOMATICAMENTE um Glow Externo ou Sombra Projetada para garantir contraste.` 
+        const colorInstruction = fontColor
+            ? `Cor Base: ${fontColor}. IMPORTANTE: Se o fundo for da mesma cor ou muito próximo, adicione AUTOMATICAMENTE um Glow Externo ou Sombra Projetada para garantir contraste.`
             : 'Cor: Use a paleta original do flyer.';
 
         const familyInstruction = fontFamily === 'Original'
@@ -531,7 +527,7 @@ Gere a imagem focando 100% na nitidez do texto do produto.`
             config: {
                 imageConfig: {
                     imageSize: "2K",
-                    aspectRatio: aspectRatio 
+                    aspectRatio: aspectRatio
                 }
             }
         });
@@ -602,7 +598,7 @@ export const enhancePrompt = async (currentPrompt: string): Promise<string> => {
     try {
         const apiKey = getApiKey();
         const ai = new GoogleGenAI({ apiKey });
-        
+
         const response = await ai.models.generateContent({
             model: TEXT_MODEL_ID,
             contents: `Você é um especialista em Prompt Engineering para geração de vídeo com IA (Veo).
@@ -631,7 +627,7 @@ export const generatePromptVariations = async (basePrompt: string, count: number
     try {
         const apiKey = getApiKey();
         const ai = new GoogleGenAI({ apiKey });
-        
+
         const response = await ai.models.generateContent({
             model: TEXT_MODEL_ID,
             contents: `Generate ${count} distinct but related variations of the following prompt for AI video generation. 
@@ -652,10 +648,10 @@ export const generatePromptVariations = async (basePrompt: string, count: number
 
         const text = response.text;
         if (text) {
-             const parsed = JSON.parse(text);
-             if (Array.isArray(parsed)) {
-                 return parsed.slice(0, count);
-             }
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+                return parsed.slice(0, count);
+            }
         }
         return Array(count).fill(basePrompt); // Fallback
 
@@ -733,7 +729,7 @@ export const generateVeoVideo = async (
     try {
         const apiKey = getApiKey();
         const ai = new GoogleGenAI({ apiKey });
-        
+
         // Use the first image as the primary frame
         const primaryImage = inputImages[0];
         const mimeType = getMimeType(primaryImage);
@@ -755,14 +751,14 @@ export const generateVeoVideo = async (
             console.log("Multi-image Veo generation triggered.");
             modelId = 'veo-3.1-generate-preview';
             validRatio = '16:9'; // Constraint: Reference images only work with 16:9 in preview
-            
+
             const referenceImagesPayload = [];
-            
+
             // We can pass up to 3 reference images (limit for safety/API constraints)
             // We use the images *after* the first one as context references, 
             // or we could use all of them. Let's use up to 3 distinctive frames from the input.
-            const refsToUse = inputImages.slice(0, 3); 
-            
+            const refsToUse = inputImages.slice(0, 3);
+
             for (const img of refsToUse) {
                 referenceImagesPayload.push({
                     image: {
@@ -772,7 +768,7 @@ export const generateVeoVideo = async (
                     referenceType: 'ASSET', // Use 'ASSET' to guide style/content
                 });
             }
-            
+
             veoConfig = {
                 numberOfVideos: 1,
                 referenceImages: referenceImagesPayload,
@@ -785,17 +781,17 @@ export const generateVeoVideo = async (
         // Note: When using referenceImages, we pass them in config, and technically don't need the 'image' property
         // at the top level if we want purely prompt + refs, OR we can pass a starting image.
         // For consistency with single-image flow, we pass primary image unless in multi-mode where we rely on config.
-        
+
         let operation;
-        
+
         if (inputImages.length > 1) {
-             operation = await ai.models.generateVideos({
+            operation = await ai.models.generateVideos({
                 model: modelId,
                 prompt: prompt || "Animate this scene naturally and cinematically.",
                 config: veoConfig
             });
         } else {
-             operation = await ai.models.generateVideos({
+            operation = await ai.models.generateVideos({
                 model: modelId,
                 prompt: prompt || "Animate this scene naturally and cinematically.",
                 image: {
@@ -809,7 +805,7 @@ export const generateVeoVideo = async (
         // 2. Polling loop
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 10000));
-            operation = await ai.operations.getVideosOperation({ operation: operation }); 
+            operation = await ai.operations.getVideosOperation({ operation: operation });
         }
 
         // Check for error
@@ -822,7 +818,7 @@ export const generateVeoVideo = async (
         // 3. Get Result
         const videos = operation.response?.generatedVideos;
         const videoUri = videos?.[0]?.video?.uri;
-        
+
         if (videoUri) {
             try {
                 const videoResponse = await fetch(videoUri, {
@@ -847,7 +843,7 @@ export const generateVeoVideo = async (
                 throw new Error(fetchError.message || "Erro ao baixar o vídeo gerado.");
             }
         }
-        
+
         throw new Error("A IA gerou o vídeo mas não retornou o link.");
 
     } catch (error: any) {
