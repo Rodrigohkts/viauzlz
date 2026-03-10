@@ -34,8 +34,8 @@ const getMimeType = (base64: string): string => {
 }
 
 // Pro model for High-Quality Fusion and Editing
-const PRO_MODEL_ID = 'gemini-2.0-pro-exp-02-05';
-const TEXT_MODEL_ID = 'gemini-3-flash-preview'; // Fast model for text enhancement
+const PRO_MODEL_ID = 'gemini-3.1-pro-image-preview';
+const TEXT_MODEL_ID = 'gemini-3.1-flash-preview'; // Fast model for text enhancement
 
 export const generateOutfitSwap = async (
     personImageBase64: string,
