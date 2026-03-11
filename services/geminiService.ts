@@ -1,21 +1,22 @@
+import { GoogleGenAI } from "@google/genai";
 
-import { GoogleGenAI, Type } from "@google/genai";
-
-// ─── Vertex AI Configuration ───────────────────────────────────────────────
-const VERTEX_PROJECT_ID = 'midyear-spot-454018-j6';
-const VERTEX_LOCATION = 'us-central1';
-const VERTEX_API_KEY = 'AQ.Ab8RN6KACU2iB5jWOg3ZGPcdXou6hmJuO62zZ6QsU-3Vds6JUQ';
+// ─── Vertex AI Express Configuration (API Key compatible) ──────────────────
+// Express mode uses projects/-/locations/global so no OAuth needed
+const VERTEX_API_KEY     = 'AQ.Ab8RN6KACU2iB5jWOg3ZGPcdXou6hmJuO62zZ6QsU-3Vds6JUQ';
+const VERTEX_PROJECT_ID  = 'midyear-spot-454018-j6'; // used for Veo SDK
+const VERTEX_LOCATION    = 'us-central1';             // used for Veo SDK
 
 // Models
-const IMAGEN_MODEL = 'imagen-3.0-generate-002';         // Text-to-image only
-const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation'; // Multi-modal editing
-const GEMINI_TEXT_MODEL = 'gemini-2.0-flash-001';            // Text generation
-const VEO_MODEL_FAST = 'veo-3.1-fast-generate-preview';
-const VEO_MODEL_QUALITY = 'veo-3.1-generate-preview';
+const IMAGEN_MODEL       = 'imagen-3.0-generate-002';
+const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation';
+const GEMINI_TEXT_MODEL  = 'gemini-2.0-flash-001';
+const VEO_MODEL_FAST     = 'veo-3.1-fast-generate-preview';
+const VEO_MODEL_QUALITY  = 'veo-3.1-generate-preview';
 
-// Build Vertex AI endpoint URL
+// Vertex AI Express endpoint — accepts API keys without OAuth 2.0
 const vertexUrl = (model: string, method: string): string =>
-    `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT_ID}/locations/${VERTEX_LOCATION}/publishers/google/models/${model}:${method}?key=${VERTEX_API_KEY}`;
+    `https://aiplatform.googleapis.com/v1beta1/projects/-/locations/global/publishers/google/models/${model}:${method}?key=${VERTEX_API_KEY}`;
+
 
 // ─── Utilities ────────────────────────────────────────────────────────────
 const cleanBase64 = (base64: string): string => {
