@@ -12,10 +12,15 @@ serve(async (req) => {
   }
 
   try {
-    const { type, model, contents, instances, parameters, generationConfig } = await req.json();
+    const jsonBody = await req.json();
+    const { type, model, contents, instances, parameters, generationConfig } = jsonBody;
     const apiKey = Deno.env.get("VERTEX_API_KEY");
     const projectId = Deno.env.get("VERTEX_PROJECT_ID") || "midyear-spot-454018-j6";
-    const region = "us-central1";
+    const isPreview = model.includes("3") || model.includes("preview");
+    
+    // Global endpoint is often required for early preview models
+    const endpoint = isPreview ? "aiplatform.googleapis.com" : "us-central1-aiplatform.googleapis.com";
+    const region = "us-central1"; 
 
     if (!apiKey) {
       throw new Error("VERTEX_API_KEY not configured in Supabase secrets");
@@ -25,49 +30,69 @@ serve(async (req) => {
     let body = {};
 
     if (type === "imagen") {
-      // Imagen 3 Text-to-Image
-      url = `https://${region}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${region}/publishers/google/models/${model}:predict?key=${apiKey}`;
+      url = `https://${endpoint}/v1beta/projects/${projectId}/locations/${region}/publishers/google/models/${model}:predict?key=${apiKey}`;
       body = {
         instances: instances || [{ prompt: contents?.[0]?.parts?.[0]?.text || "" }],
         parameters: parameters || { sampleCount: 1, aspectRatio: "1:1" }
       };
     } else {
-      // Gemini models (Flash/Pro) for Text or Image Editing
-      url = `https://${region}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${region}/publishers/google/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      url = `https://${endpoint}/v1beta/projects/${projectId}/locations/${region}/publishers/google/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
       body = {
         contents: contents || [],
         generationConfig: generationConfig || {},
       };
       
-      // If not streaming requested, use non-stream endpoint
       if (!req.url.includes("stream=true")) {
         url = url.replace("streamGenerateContent?alt=sse&", "generateContent?");
       }
     }
 
-    console.log(`Proxying ${type} request to: ${url.split('?')[0]}`);
+    console.log(`Proxying request to: ${url.replace(apiKey, "REDACTED")}`);
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Vertex AI Error:", data);
-      return new Response(JSON.stringify({ error: data.error?.message || "Vertex AI API Error", details: data }), {
-        status: response.status,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    // ─── Automatic Fallback for 404 (Model Not Found) ─────────────────────
+    if (response.status === 404 && isPreview) {
+      console.warn(`Model ${model} not found (404). Attempting fallback...`);
+      const fallbackModel = model.includes("pro") ? "gemini-2.0-pro-exp-02-05" : "gemini-2.5-flash-image";
+      const fallbackRegion = "us-central1";
+      const fallbackUrl = `https://us-central1-aiplatform.googleapis.com/v1beta/projects/${projectId}/locations/${fallbackRegion}/publishers/google/models/${fallbackModel}:${type === "imagen" ? "predict" : "generateContent"}?key=${apiKey}`;
+      
+      console.log(`Fallback URL: ${fallbackUrl.replace(apiKey, "REDACTED")}`);
+      response = await fetch(fallbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
     }
 
-    return new Response(JSON.stringify(data), {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
+    console.log(`Response status: ${response.status}`);
+    
+    // Robust parsing
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      if (!response.ok) {
+        return new Response(JSON.stringify({ error: data.error?.message || "Vertex AI API Error", details: data }), {
+          status: response.status,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(data), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    } else {
+      const text = await response.text();
+      return new Response(text, {
+        status: response.status,
+        headers: { ...CORS_HEADERS, "Content-Type": contentType },
+      });
+    }
+
   } catch (err: any) {
     console.error("Proxy Error:", err.message);
     return new Response(JSON.stringify({ error: err.message }), {
