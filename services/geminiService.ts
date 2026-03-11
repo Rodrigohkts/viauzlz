@@ -1,7 +1,6 @@
 
 // ─── Supabase Edge Function proxy for Vertex AI ───────────────────────────
-// Set VITE_SUPABASE_URL in your .env / Vercel env vars
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_URL = 'https://dbpbtwwtitaiwojtudde.supabase.co';
 const PROXY_URL    = `${SUPABASE_URL}/functions/v1/vertex-proxy`;
 
 const VERTEX_PROJECT_ID = 'midyear-spot-454018-j6';
