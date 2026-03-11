@@ -65,10 +65,12 @@ const imagenGenerate = async (prompt: string, aspectRatio: string = '1:1'): Prom
         },
     });
 
-    const encoded = data.predictions?.[0]?.bytesBase64Encoded;
+    const prediction = data.predictions?.[0];
+    const encoded = prediction?.bytesBase64 || prediction?.bytesBase64Encoded;
     if (encoded) return `data:image/png;base64,${encoded}`;
     throw new Error('Imagen não retornou uma imagem válida.');
 };
+
 
 // ─── Gemini: Multi-modal image editing ───────────────────────────────────
 type GeminiPart =
