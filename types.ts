@@ -63,6 +63,7 @@ export interface SavedFlowState {
     process: Position;
     output: Position;
     editor: Position;
+    bgEditor: Position;
     final: Position;
     poseControl: Position;
     poseOutput: Position;
