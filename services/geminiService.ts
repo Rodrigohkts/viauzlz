@@ -6,9 +6,9 @@ const PROXY_URL    = `${SUPABASE_URL}/functions/v1/vertex-proxy`;
 const VERTEX_PROJECT_ID = 'midyear-spot-454018-j6';
 
 // Models
-const IMAGEN_MODEL       = 'imagen-3.0-generate-002';
-const GEMINI_IMAGE_MODEL = 'gemini-2.0-pro-exp-02-05';
-const GEMINI_TEXT_MODEL  = 'gemini-2.0-flash-001';
+const IMAGEN_MODEL       = 'gemini-3.1-flash-image-preview';
+const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+const GEMINI_TEXT_MODEL  = 'gemini-3.1-flash-image-preview';
 const VEO_MODEL_FAST     = 'veo-3.1-fast-generate-preview';
 const VEO_MODEL_QUALITY  = 'veo-3.1-generate-preview';
 
