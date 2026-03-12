@@ -237,7 +237,11 @@ export const generateImageFromText = async (
     prompt: string,
     aspectRatio: string = '1:1'
 ): Promise<string> => {
-    return imagenGenerate(prompt, aspectRatio);
+    return geminiImageGenerate([
+        {
+            text: `(Instrução de Aspect Ratio: ${aspectRatio})\nAja como um criador de imagens mestre e gere uma imagem com a melhor qualidade possível utilizando a seguinte descrição:\n\n"${prompt}"`
+        }
+    ]);
 };
 
 export const generateUltraImage = async (
