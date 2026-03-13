@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const jsonBody = await req.json();
     const { type, model, contents, instances, parameters, generationConfig } = jsonBody;
-    const apiKey = Deno.env.get("VERTEX_API_KEY");
+    const apiKey = "AIzaSyD7uWPNKHaonXmizLWhGbIUUxAKq-4lVIc"; // Hardcoded specific key with 6k credits
     const projectId = Deno.env.get("VERTEX_PROJECT_ID") || "midyear-spot-454018-j6";
     const isPreview = model.includes("3") || model.includes("preview");
     

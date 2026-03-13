@@ -1,9 +1,19 @@
 
-// ─── Supabase Edge Function proxy for Vertex AI ───────────────────────────
-const SUPABASE_URL = 'https://dbpbtwwtitaiwojtudde.supabase.co';
-const PROXY_URL    = `${SUPABASE_URL}/functions/v1/vertex-proxy`;
+import { GoogleGenAI } from '@google/genai';
 
+// ─── API CONFIGURATION ──────────────────────────────────────────────────────
+const FALLBACK_API_KEY = 'AIzaSyCwz0aCjRhwQuPGxA_HnJk3D3VhDJlHPUU';
 const VERTEX_PROJECT_ID = 'midyear-spot-454018-j6';
+
+const getApiKey = (): string => {
+    const customKey = localStorage.getItem('vizualz_custom_api_key');
+    return customKey || FALLBACK_API_KEY;
+};
+
+// ─── Supabase Edge Function proxy for Vertex AI (Legacy/Fallback) ───────────
+const SUPABASE_URL      = 'https://dbpbtwwtitaiwojtudde.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicGJ0d3d0aXRhaXdvanR1ZGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMjEzMzUsImV4cCI6MjA4ODc5NzMzNX0.MLWAlGNbXSYoAvxy-7yYCydyJGgcVlsD_sEl6hrX9g4';
+const PROXY_URL         = `${SUPABASE_URL}/functions/v1/vertex-proxy`;
 
 // Models
 const IMAGEN_MODEL       = 'imagen-3.0-generate-002';
@@ -29,17 +39,41 @@ const getMimeType = (base64: string): string => {
     return 'image/jpeg';
 };
 
-// ─── Call proxy helper ────────────────────────────────────────────────────
-const callProxy = async (body: object): Promise<any> => {
-    if (!SUPABASE_URL) throw new Error('VITE_SUPABASE_URL não configurado. Adicione nas variáveis de ambiente.');
+// ─── SDK Initialization ───────────────────────────────────────────────────
+let genAI: any = null;
+const getGenAI = () => {
+    const key = getApiKey();
+    if (!genAI || genAI._apiKey !== key) {
+        // Use GoogleGenAI instead of GoogleGenerativeAI for this version of the SDK
+        genAI = new GoogleGenAI({ apiKey: key }); 
+    }
+    return genAI;
+};
 
+// ─── Call proxy helper (Legacy) ───────────────────────────────────────────
+const callProxy = async (body: object): Promise<any> => {
     const res = await fetch(PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
         body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+
+    if (!text || !text.trim()) {
+        throw new Error(`Proxy retornou resposta vazia (status ${res.status}). Verifique se a função Edge está deployada.`);
+    }
+
+    let data: any;
+    try {
+        data = JSON.parse(text);
+    } catch {
+        throw new Error(`Resposta inválida do proxy (não é JSON): ${text.substring(0, 200)}`);
+    }
 
     if (!res.ok || data.error) {
         const msg = data.error || `Proxy error: ${res.status}`;
@@ -52,6 +86,26 @@ const callProxy = async (body: object): Promise<any> => {
 
 // ─── Imagen 3: Text-to-image ──────────────────────────────────────────────
 const imagenGenerate = async (prompt: string, aspectRatio: string = '1:1'): Promise<string> => {
+    // Current @google/genai SDK might not support Imagen 3 natively yet in some versions, 
+    // but Gemini 2.0 can generate images. However, keeping the proxy as fallback.
+    try {
+        const ai = getGenAI();
+        const model = ai.getGenerativeModel({ model: GEMINI_IMAGE_MODEL });
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ['IMAGE'] }
+        });
+        
+        const parts = result.response.candidates?.[0]?.content?.parts;
+        if (parts) {
+            for (const p of parts) {
+                if (p.inlineData?.data) return `data:image/png;base64,${p.inlineData.data}`;
+            }
+        }
+    } catch (e) {
+        console.warn('Direct SDK Imagen failed, falling back to proxy:', e);
+    }
+
     const data = await callProxy({
         type: 'imagen',
         model: IMAGEN_MODEL,
@@ -78,6 +132,31 @@ type GeminiPart =
     | { inlineData: { mimeType: string; data: string } };
 
 const geminiImageGenerate = async (parts: GeminiPart[]): Promise<string> => {
+    try {
+        const ai = getGenAI();
+        const model = ai.getGenerativeModel({ model: GEMINI_IMAGE_MODEL });
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts }],
+            generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+        });
+
+        const respParts = result.response.candidates?.[0]?.content?.parts;
+        if (respParts) {
+            for (const p of respParts) {
+                if (p.inlineData?.data) return `data:image/png;base64,${p.inlineData.data}`;
+            }
+            for (const p of respParts) {
+                if (p.text) {
+                    console.warn('Model Refusal:', p.text);
+                    throw new Error('A IA recusou gerar a imagem (Safety/Policy). Tente uma imagem diferente.');
+                }
+            }
+        }
+    } catch (e: any) {
+        if (e.message?.includes('Safety') || e.message?.includes('policy')) throw e;
+        console.warn('Direct SDK Gemini failed, falling back to proxy:', e);
+    }
+
     const data = await callProxy({
         type: 'gemini',
         model: GEMINI_IMAGE_MODEL,
@@ -102,6 +181,18 @@ const geminiImageGenerate = async (parts: GeminiPart[]): Promise<string> => {
 
 // ─── Gemini: Text generation ──────────────────────────────────────────────
 const geminiText = async (prompt: string, jsonMode = false): Promise<string> => {
+    try {
+        const ai = getGenAI();
+        const model = ai.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: jsonMode ? { responseMimeType: 'application/json' } : {},
+        });
+        return result.response.text();
+    } catch (e) {
+        console.warn('Direct SDK Gemini Text failed, falling back to proxy:', e);
+    }
+
     const data = await callProxy({
         type: 'gemini',
         model: GEMINI_TEXT_MODEL,
@@ -283,13 +374,44 @@ export const generatePromptVariations = async (basePrompt: string, count: number
 };
 
 // ─── Video Generation (Veo) ───────────────────────────────────────────────
-// Veo uses @google/genai SDK with Vertex AI mode (handles OAuth internally via project config)
 export const generateVeoVideo = async (
     inputImages: string[],
     prompt: string,
     aspectRatio: string = '16:9',
     modelType: 'fast' | 'quality' = 'fast'
 ): Promise<string> => {
-    // Veo via Supabase proxy (Vertex AI OAuth handled server-side)
-    throw new Error('Geração de vídeo via Supabase em breve. Use a versão anterior por enquanto.');
+    try {
+        const ai = getGenAI();
+        const modelName = modelType === 'fast' ? VEO_MODEL_FAST : VEO_MODEL_QUALITY;
+        const model = ai.getGenerativeModel({ model: modelName });
+
+        const parts: any[] = [{ text: prompt }];
+        for (const img of inputImages) {
+            parts.push({
+                inlineData: {
+                    mimeType: getMimeType(img),
+                    data: cleanBase64(img)
+                }
+            });
+        }
+
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts }],
+            // Veo specific parameters can be added here if supported by the SDK version
+        });
+
+        const videoPart = result.response.candidates?.[0]?.content?.parts.find((p: any) => p.inlineData?.mimeType.includes('video'));
+        
+        if (videoPart?.inlineData?.data) {
+            return `data:${videoPart.inlineData.mimeType};base64,${videoPart.inlineData.data}`;
+        }
+        
+        // Fallback or handle poll-based video generation if the SDK returns a job ID (long-running)
+        // Most recent SDKs for Veo 3.1 provide direct data or a Cloud Storage URI.
+        throw new Error('O modelo não retornou dados de vídeo diretamente.');
+        
+    } catch (e: any) {
+        console.error('Veo Generation Error:', e);
+        throw new Error(e.message || 'Erro interno ao gerar vídeo com Veo.');
+    }
 };
